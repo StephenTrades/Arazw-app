@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Αρα..Ζω - Παραγγελίες</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin:0; padding:0;
+    background: #f9f9f9;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  header {
+    background: #00796b;
+    color: white;
+    text-align: center;
+    padding: 1rem;
+    font-size: 1.5rem;
+    font-weight: bold;
+    user-select: none;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+  }
+  #tableList {
+    width: 120px;
+    background: #004d40;
+    color: white;
+    overflow-y: auto;
+    padding: 0.5rem;
+  }
+  #tableList button {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: white;
+    padding: 0.5rem;
+    margin-bottom: 0.3rem;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1rem;
+  }
+  #tableList button.selected {
+    background: #26a69a;
+    font-weight: bold;
+  }
+  #tableList button:hover {
+    background: #00897b;
+  }
+  #editNameBtn {
+    background: none;
+    border: none;
+    color: #eee;
+    cursor: pointer;
+    font-size: 1.1rem;
+    margin-left: 0.3rem;
+  }
+  #orderSection {
+    flex: 1;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+  #orderSection h2 {
+    margin-top: 0;
+  }
+  #orderList {
+    flex: 1;
+    background: white;
+    padding: 0.5rem;
+    border-radius: 5px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+  }
+  #orderList li {
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid #ddd;
+  }
+  #newDrinkForm {
+    display: flex;
+    gap: 0.5rem;
+  }
+  #newDrinkForm input {
+    flex: 1;
+    padding: 0.5rem;
+    font-size: 1rem;
+  }
+  #newDrinkForm button {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    background: #00796b;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  #clearOrderBtn {
+    margin-top: 0.5rem;
+    background: #d32f2f;
+    border: none;
+    color: white;
+    padding: 0.7rem 1rem;
+    font-size: 1rem;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  /* Edit table name input style */
+  #editNameInput {
+    flex: 1;
+    font-size: 1rem;
+    padding: 0.3rem;
+  }
+  @media (max-width: 600px) {
+    main {
+      flex-direction: column;
+    }
+    #tableList {
+      width: 100%;
+      display: flex;
+      overflow-x: auto;
+    }
+    #tableList button {
+      flex: none;
+      min-width: 100px;
+      margin-right: 0.3rem;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>Αρα..Ζω</header>
+
+<main>
+  <nav id="tableList" aria-label="Λίστα τραπεζιών">
+    <!-- Τα τραπέζια φορτώνονται εδώ -->
+  </nav>
+
+  <section id="orderSection" aria-live="polite">
+    <h2 id="tableTitle">Παραγγελία τραπεζιού</h2>
+    <ul id="orderList" aria-label="Τρέχουσα παραγγελία"></ul>
+    <form id="newDrinkForm">
+      <input type="text" id="drinkInput" placeholder="Προσθήκη ποτού..." aria-label="Προσθήκη ποτού" autocomplete="off" required />
+      <button type="submit">+</button>
+    </form>
+    <button id="clearOrderBtn" aria-label="Καθαρισμός παραγγελίας">Καθαρισμός παραγγελίας</button>
+  </section>
+</main>
+
+<script>
+  const NUM_TABLES = 9;
+
+  // Φόρτωση δεδομένων από το localStorage ή αρχικοποίηση
+  let tables = JSON.parse(localStorage.getItem('tables')) || {};
+  let selectedTable = null;
+
+  // Αν δεν υπάρχουν ονόματα τραπεζιών, βάζουμε προεπιλογή
+  for(let i=1; i <= NUM_TABLES; i++) {
+    if(!tables[i]) {
+      tables[i] = {
+        name: `Τραπέζι ${i}`,
+        drinks: []
+      };
+    }
+  }
+
+  const tableList = document.getElementById('tableList');
+  const orderList = document.getElementById('orderList');
+  const tableTitle = document.getElementById('tableTitle');
+  const drinkInput = document.getElementById('drinkInput');
+  const newDrinkForm = document.getElementById('newDrinkForm');
+  const clearOrderBtn = document.getElementById('clearOrderBtn');
+
+  function saveTables() {
+    localStorage.setItem('tables', JSON.stringify(tables));
+  }
+
+  function renderTables() {
+    tableList.innerHTML = '';
+    for(let i=1; i <= NUM_TABLES; i++) {
+      const btn = document.createElement('button');
+      btn.setAttribute('aria-pressed', selectedTable === i);
+      btn.className = (selectedTable === i) ? 'selected' : '';
+      btn.innerHTML = '';
+      
+      // Δημιουργούμε span για όνομα τραπεζιού
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = tables[i].name;
+      nameSpan.style.flexGrow = '1';
+      btn.appendChild(nameSpan);
+
+      // Δημιουργούμε κουμπί επεξεργασίας ονόματος
+      const editBtn = document.createElement('button');
+      editBtn.textContent = '✎';
+      editBtn.setAttribute('aria-label', `Επεξεργασία ονόματος ${tables[i].name}`);
+      editBtn.id = `editNameBtn-${i}`;
+      editBtn.style.background = 'none';
+      editBtn.style.border = 'none';
+      editBtn.style.color = '#eee';
+      editBtn.style.cursor = 'pointer';
+      editBtn.style.fontSize = '1.1rem';
+      editBtn.style.marginLeft = '0.3rem';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editTableName(i);
+      });
+      btn.appendChild(editBtn);
+
+      btn.addEventListener('click', () => {
+        selectTable(i);
+      });
+
+      tableList.appendChild(btn);
+    }
+  }
+
+  function selectTable(num) {
+    selectedTable = num;
+    renderTables();
+    renderOrder();
+  }
+
+  function renderOrder() {
+    if (!selectedTable) return;
+    tableTitle.textContent = `Παραγγελία: ${tables[selectedTable].name}`;
+    orderList.innerHTML = '';
+    tables[selectedTable].drinks.forEach((drink, idx) => {
+      const li = document.createElement('li');
+      li.textContent = drink;
+      orderList.appendChild(li);
+    });
+  }
+
+  function editTableName(num) {
+    const btn = document.querySelector(`#tableList button:nth-child(${num})`);
+    if (!btn) return;
+
+    // Αν ήδη είναι σε edit mode, μην κάνεις τίποτα
+    if (btn.querySelector('input')) return;
+
+    const currentName = tables[num].name;
+    btn.innerHTML = '';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'editNameInput';
+    input.value = currentName;
+    input.style.flexGrow = '1';
+    btn.appendChild(input);
+    input.focus();
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveName();
+      }
+      if (e.key === 'Escape') {
+        renderTables();
+      }
+    });
+    input.addEventListener('blur', () => {
+      saveName();
+    });
+
+    function saveName() {
+      const newName = input.value.trim() || currentName;
+      tables[num].name = newName;
+      saveTables();
+      renderTables();
+      if (selectedTable === num) renderOrder();
+    }
+  }
+
+  newDrinkForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!selectedTable) return alert('Επίλεξε πρώτα τραπέζι!');
+    const drink = drinkInput.value.trim();
+    if (!drink) return;
+    tables[selectedTable].drinks.push(drink);
+    saveTables();
+    renderOrder();
+    drinkInput.value = '';
+    drinkInput.focus();
+  });
+
+  clearOrderBtn.addEventListener('click', () => {
+    if (!selectedTable) return;
+    if (!confirm(`Θέλεις να καθαρίσεις την παραγγελία στο ${tables[selectedTable].name};`)) return;
+    tables[selectedTable].drinks = [];
+    saveTables();
+    renderOrder();
+  });
+
+  // Αρχική επιλογή τραπεζιού 1
+  selectTable(1);
+
+  // Απόδοση αρχικής λίστας τραπεζιών
+  renderTables();
+
+</script>
+
+</body>
+</html>
+
